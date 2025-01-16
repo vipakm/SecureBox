@@ -83,15 +83,17 @@ namespace SecureBox.Controllers
         }
 
         // Verify OTP
+        // Verify OTP
         [HttpPost("verify-otp")]
-        public IActionResult VerifyOtp([FromBody] string userOtp)
+        public IActionResult VerifyOtp([FromBody] VerifyOtpDto model)
         {
-            if (string.IsNullOrWhiteSpace(userOtp))
+            if (model == null || string.IsNullOrWhiteSpace(model.UserMailId) || string.IsNullOrWhiteSpace(model.Otp))
             {
-                return BadRequest("OTP is required.");
+                return BadRequest(new { message = "UserMailId and OTP are required.", code = 400 });
             }
 
-            var isOtpValid = _userService.VerifyOtp(userOtp);
+            var isOtpValid = _userService.VerifyOtp(model.UserMailId, model.Otp);
+
             if (isOtpValid)
             {
                 return Ok(new { message = "OTP verified successfully", code = 200 });
@@ -101,6 +103,7 @@ namespace SecureBox.Controllers
                 return BadRequest(new { message = "Invalid or expired OTP", code = 400 });
             }
         }
+
 
         [HttpPost("verifyUser")]
         public async Task<IActionResult> VerifyUserOtp([FromBody] VerifyOtpDto model)

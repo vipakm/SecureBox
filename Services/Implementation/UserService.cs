@@ -469,24 +469,29 @@ namespace SecureBox.Services
 
 
         // Verify OTP from session
-        public bool VerifyOtp(string userOtp)
+        public bool VerifyOtp(string userMailId, string userOtp)
         {
-            var otp = _httpContextAccessor.HttpContext.Session.GetString("OTP");
-            var otpExpiry = _httpContextAccessor.HttpContext.Session.GetString("OTPExpiry");
+            // Retrieve OTP and expiry based on the user's email
+            var otpKey = $"{userMailId}_OTP"; // Unique key for OTP
+            var otpExpiryKey = $"{userMailId}_OTPExpiry"; // Unique key for expiry
 
-            if (otp == null || otpExpiry == null)
+            var otp = _httpContextAccessor.HttpContext.Session.GetString(otpKey);
+            var otpExpiry = _httpContextAccessor.HttpContext.Session.GetString(otpExpiryKey);
+
+            if (string.IsNullOrEmpty(otp) || string.IsNullOrEmpty(otpExpiry))
             {
                 return false; // OTP expired or not found
             }
 
             if (DateTime.TryParse(otpExpiry, out DateTime expiry) && DateTime.Now <= expiry)
             {
-                return otp == userOtp;
+                return otp == userOtp; // Check if OTP matches
             }
             else
             {
                 return false; // OTP expired
             }
         }
+
     }
 }

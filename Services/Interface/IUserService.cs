@@ -18,7 +18,7 @@ namespace SecureBox.Services.Interface
         string GenerateJwtToken(UserDetail user);
 
         // Verify OTP
-        bool VerifyOtp(string userOtp);
+        bool VerifyOtp(string userMailId, string userOtp);
         Task<string> VerifyOtpAsync(string userMailId, string inputOtp);
         Task<string> UpdatePasswordAsync(string userMailId, string newPassword);
     }
