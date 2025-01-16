@@ -7,17 +7,21 @@ namespace SecureBox.Helpers
 {
     public class EncryptionHelper
     {
-        // You can store the Key and IV securely using environment variables or a key vault in a production scenario
+        // Use a valid Base64-encoded key (32 bytes for AES-256) and IV (16 bytes)
         private static readonly string Key = "j8Fg/G1PVpXcDcvk/yK21tPzlyqUqaHz4VPhZvHX0qs="; // 32 bytes key for AES-256
         private static readonly string Iv = "HR6WBxUq1ZW6gFz6gs02rA=="; // 16 bytes IV for AES
 
         // Encrypt the plain text (password)
         public static string Encrypt(string plainText)
         {
+            // Decode the Base64-encoded key and IV
+            byte[] keyBytes = Convert.FromBase64String(Key);
+            byte[] ivBytes = Convert.FromBase64String(Iv);
+
             using (Aes aesAlg = Aes.Create())
             {
-                aesAlg.Key = Encoding.UTF8.GetBytes(Key);
-                aesAlg.IV = Encoding.UTF8.GetBytes(Iv);
+                aesAlg.Key = keyBytes;
+                aesAlg.IV = ivBytes;
 
                 ICryptoTransform encryptor = aesAlg.CreateEncryptor(aesAlg.Key, aesAlg.IV);
 
@@ -27,6 +31,9 @@ namespace SecureBox.Helpers
                 {
                     // Write the data to the stream
                     swEncrypt.Write(plainText);
+                    swEncrypt.Flush();
+                    csEncrypt.FlushFinalBlock();
+
                     // Return the encrypted text as Base64 string
                     return Convert.ToBase64String(msEncrypt.ToArray());
                 }
@@ -36,10 +43,14 @@ namespace SecureBox.Helpers
         // Decrypt the cipher text (password)
         public static string Decrypt(string cipherText)
         {
+            // Decode the Base64-encoded key and IV
+            byte[] keyBytes = Convert.FromBase64String(Key);
+            byte[] ivBytes = Convert.FromBase64String(Iv);
+
             using (Aes aesAlg = Aes.Create())
             {
-                aesAlg.Key = Encoding.UTF8.GetBytes(Key);
-                aesAlg.IV = Encoding.UTF8.GetBytes(Iv);
+                aesAlg.Key = keyBytes;
+                aesAlg.IV = ivBytes;
 
                 ICryptoTransform decryptor = aesAlg.CreateDecryptor(aesAlg.Key, aesAlg.IV);
 
