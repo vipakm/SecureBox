@@ -32,28 +32,38 @@ namespace SecureBox.Services
         // Registration Method
         public async Task<string> RegisterAsync(string userName, string userMailId, long? userPhoneNo, string userPassword)
         {
+            // Validate inputs
+            if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(userMailId) || string.IsNullOrWhiteSpace(userPassword))
+            {
+                return "Invalid input. Please provide all required details.";
+            }
+
+            if (!IsValidEmail(userMailId))
+            {
+                return "Invalid email address.";
+            }
+
+            if (userPhoneNo.HasValue && (userPhoneNo.Value <= 0 || userPhoneNo.Value.ToString().Length != 10))
+            {
+                return "Invalid phone number. Must be a 10-digit number.";
+            }
+
             // Check if the email already exists in the database
             var userExists = await _context.UserDetails.FirstOrDefaultAsync(u => u.UserMailId == userMailId);
             if (userExists != null)
             {
-                return "User already exists";
+                return "User already exists.";
             }
 
-            // Validate phone number (ensure no 0)
-            if (userPhoneNo.HasValue && userPhoneNo.Value == 0)
-            {
-                return "Invalid phone number.";
-            }
-
-            // Generate OTP and send to user via email
-            var otp = new Random().Next(1000, 9999).ToString();
+            // Generate a secure OTP
+            var otp = GenerateSecureOtp();
             var subject = "OTP for User Registration";
 
             // Store OTP and expiry time in session
             _httpContextAccessor.HttpContext.Session.SetString("OTP", otp);
-            _httpContextAccessor.HttpContext.Session.SetString("OTPExpiry", DateTime.Now.AddMinutes(10).ToString());
+            _httpContextAccessor.HttpContext.Session.SetString("OTPExpiry", DateTime.Now.AddMinutes(10).ToString("o")); // ISO 8601 format
 
-            // Beautiful Email HTML body
+            // Compose email body
             string htmlBody = $@"
 <!DOCTYPE html>
 <html lang='en'>
@@ -69,7 +79,6 @@ namespace SecureBox.Services
             padding: 0;
         }}
         .container {{
-            width: 100%;
             max-width: 600px;
             margin: 0 auto;
             background: #fff;
@@ -80,53 +89,45 @@ namespace SecureBox.Services
         h1 {{
             color: #333;
             text-align: center;
-            font-size: 24px;
-        }}
-        p {{
-            font-size: 16px;
-            line-height: 1.5;
-            margin: 10px 0;
         }}
         .otp {{
             font-size: 20px;
             font-weight: bold;
             color: #007bff;
-            padding: 10px;
-            border: 1px solid #007bff;
-            border-radius: 5px;
-            text-align: center;
             margin: 20px 0;
+            text-align: center;
         }}
         .footer {{
             text-align: center;
             font-size: 12px;
             color: #888;
-            margin-top: 30px;
-        }}
-        .footer a {{
-            color: #007bff;
-            text-decoration: none;
+            margin-top: 20px;
         }}
     </style>
 </head>
 <body>
     <div class='container'>
         <h1>Welcome to SecureBox, {userName}!</h1>
-        <p>Thank you for registering with SecureBox. We are excited to have you onboard.</p>
-        <p>Your One-Time Password (OTP) for completing the registration process is:</p>
+        <p>Thank you for registering with us. Use the OTP below to complete your registration:</p>
         <div class='otp'>{otp}</div>
-        <p>This OTP is valid for 10 minutes, so please use it to complete your registration within the given time frame.</p>
-        <p>If you did not request this registration, please ignore this email or contact our support team.</p>
+        <p>This OTP is valid for 10 minutes. If you did not request this registration, please contact our support team.</p>
         <div class='footer'>
-            <p>&copy; {DateTime.Now.Year} EbonCore Nexus Technologies. All rights reserved.</p>
-            <p>If you need assistance, contact us at <a href='mailto:support@ecntech.in'>support@ecntech.in</a></p>
+            &copy; {DateTime.Now.Year} EbonCore Nexus Technologies
         </div>
     </div>
 </body>
 </html>";
 
-            // Send OTP email asynchronously
-            await _emailService.SendEmailAsync(userMailId, subject, htmlBody);
+            try
+            {
+                // Send the OTP email
+                await _emailService.SendEmailAsync(userMailId, subject, htmlBody);
+            }
+            catch (Exception ex)
+            {
+                // Log the error (optional)
+                return "Failed to send OTP email. Please try again later.";
+            }
 
             // Generate the next UserId (max + 1) or set to 1 if the table is empty
             var maxUserId = await _context.UserDetails.MaxAsync(u => (int?)u.UserId) ?? 0;
@@ -142,7 +143,7 @@ namespace SecureBox.Services
                 UserName = userName,
                 UserMailId = userMailId,
                 UserPhoneNo = userPhoneNo,
-                UserPassword = hashedPassword, // Store the hashed password
+                UserPassword = hashedPassword,
                 UserStatus = false,
             };
 
@@ -150,6 +151,31 @@ namespace SecureBox.Services
             await _context.SaveChangesAsync();
 
             return "OTP sent to your email. Please verify to complete registration.";
+        }
+
+        // Utility to validate email address
+        private bool IsValidEmail(string email)
+        {
+            try
+            {
+                var addr = new System.Net.Mail.MailAddress(email);
+                return addr.Address == email;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // Secure OTP generation
+        private string GenerateSecureOtp()
+        {
+            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
+            {
+                var bytes = new byte[4];
+                rng.GetBytes(bytes);
+                return (BitConverter.ToUInt32(bytes, 0) % 9000 + 1000).ToString(); // 4-digit OTP
+            }
         }
 
         // OTP Verification Method
@@ -286,20 +312,40 @@ namespace SecureBox.Services
         // Reset Password (OTP generation and email)
         public async Task<string> ResetPasswordAsync(string email)
         {
+            // Validate email input
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return "Email address is required.";
+            }
+
+            // Check if the user exists
             var user = await _context.UserDetails.FirstOrDefaultAsync(u => u.UserMailId == email);
             if (user == null)
             {
-                return "User not found";
+                return "User not found.";
             }
 
+            // Generate OTP
             var otp = new Random().Next(1000, 9999).ToString();
-            var subject = "OTP for Password Reset";
+            var subject = "Your OTP for Password Reset";
 
-            // Store the OTP in the session
+            // Store the OTP and expiry time in the session
             _httpContextAccessor.HttpContext.Session.SetString("OTP", otp);
             _httpContextAccessor.HttpContext.Session.SetString("OTPExpiry", DateTime.Now.AddMinutes(10).ToString());
 
-            // Define the HTML body of the email
+            // Define the plain text and HTML body
+            string plainTextBody = $@"
+Hello {user.UserName},
+
+We received a request to reset your SecureBox account password. Use the OTP below to complete the process:
+
+OTP: {otp}
+
+The OTP is valid for 10 minutes. If you did not request a password reset, please ignore this email.
+
+Thank you,
+The SecureBox Team";
+
             string htmlBody = $@"
 <!DOCTYPE html>
 <html lang='en'>
@@ -312,7 +358,7 @@ namespace SecureBox.Services
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f4f4f9;
+            background-color: #f9f9f9;
             color: #333;
         }}
         .container {{
@@ -322,36 +368,35 @@ namespace SecureBox.Services
             padding: 20px;
             background-color: #fff;
             border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
         }}
         .header {{
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }}
         .header h1 {{
+            font-size: 20px;
             color: #333;
-            font-size: 24px;
         }}
         .content {{
             font-size: 16px;
-            line-height: 1.5;
             margin-bottom: 20px;
         }}
         .otp {{
             font-size: 22px;
             font-weight: bold;
-            color: #4caf50;
+            color: #007bff;
             text-align: center;
             margin-bottom: 20px;
         }}
         .footer {{
             font-size: 12px;
-            color: #888;
+            color: #777;
             text-align: center;
             margin-top: 20px;
         }}
         .footer a {{
-            color: #4caf50;
+            color: #007bff;
             text-decoration: none;
         }}
     </style>
@@ -363,25 +408,23 @@ namespace SecureBox.Services
         </div>
         <div class='content'>
             <p>Hello {user.UserName},</p>
-            <p>We received a request to reset the password for your SecureBox account. To complete the process, please use the OTP below:</p>
-            <div class='otp'>
-                {otp}
-            </div>
+            <p>We received a request to reset your SecureBox account password. Use the OTP below to complete the process:</p>
+            <div class='otp'>{otp}</div>
             <p>The OTP is valid for 10 minutes. If you did not request a password reset, please ignore this email.</p>
-            <p>Thank you for using SecureBox!</p>
+            <p>Thank you,<br>The SecureBox Team</p>
         </div>
         <div class='footer'>
-            <p>If you have any questions, please contact our support team at <a href='mailto:support@securebox.com'>support@securebox.com</a>.</p>
-            <p>SecureBox | All rights reserved</p>
+            <p>Need help? Contact us at <a href='mailto:support@securebox.com'>support@securebox.com</a>.</p>
+            <p>&copy; {DateTime.Now.Year} SecureBox. All rights reserved.</p>
         </div>
     </div>
 </body>
 </html>";
 
-            // Send the email asynchronously with the HTML body
+            // Send the email with both plain text and HTML body
             await _emailService.SendEmailAsync(user.UserMailId, subject, htmlBody);
 
-            return "OTP sent to your email";
+            return "OTP sent to your email.";
         }
 
         // Generate JWT token for authentication
