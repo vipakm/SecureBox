@@ -7,8 +7,11 @@ using BCrypt.Net;
 using Microsoft.EntityFrameworkCore;
 using SecureBox.Data;
 using SecureBox.Services.Interface;
+using SecureBox.ViewModels;
 using System;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity.Data;
+using Microsoft.AspNetCore.Mvc;
 
 namespace SecureBox.Services
 {
@@ -254,17 +257,31 @@ namespace SecureBox.Services
         }
 
         // Login User
-        public async Task<string> LoginAsync(string email, string password)
+        public async Task<LoginResult> LoginAsync(string email, string password)
         {
             var user = await _context.UserDetails.FirstOrDefaultAsync(u => u.UserMailId == email);
             if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.UserPassword))
             {
-                return "Invalid credentials";
+                return new LoginResult
+                {
+                    Success = false,
+                    Message = "Invalid credentials",
+                    Code = 401
+                };
             }
 
             var token = GenerateJwtToken(user);
-            return token;
+            return new LoginResult
+            {
+                Success = true,
+                Token = token,
+                UserId = user.UserId,
+                Message = "Login successful",
+                Code = 200
+            };
         }
+
+
 
         // Reset Password (OTP generation and email)
         public async Task<string> ResetPasswordAsync(string email)
@@ -371,10 +388,10 @@ namespace SecureBox.Services
         public string GenerateJwtToken(UserDetail user)
         {
             var claims = new[] {
-                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
-                new Claim(ClaimTypes.Name, user.UserName),
-                new Claim(ClaimTypes.Email, user.UserMailId)
-            };
+        new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()), // User ID
+        new Claim(ClaimTypes.Name, user.UserName),
+        new Claim(ClaimTypes.Email, user.UserMailId),
+    };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JwtSettings:Key"]));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -384,12 +401,12 @@ namespace SecureBox.Services
                 audience: _configuration["JwtSettings:Audience"],
                 claims: claims,
                 expires: DateTime.Now.AddMinutes(Convert.ToDouble(_configuration["JwtSettings:ExpirationInMinutes"])),
-
                 signingCredentials: creds
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
 
         public async Task<string> UpdatePasswordAsync(string userMailId, string newPassword)
         {

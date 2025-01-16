@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using SecureBox.Models;
 using SecureBox.Services.Interface;
+using System.Linq;
 
 namespace SecureBox.Controllers
 {
@@ -50,17 +51,22 @@ namespace SecureBox.Controllers
         {
             if (model == null || string.IsNullOrWhiteSpace(model.Email) || string.IsNullOrWhiteSpace(model.Password))
             {
-                return BadRequest("Invalid login credentials.");
+                return BadRequest(new { message = "Invalid login credentials.", code = 400 });
             }
 
             var result = await _userService.LoginAsync(model.Email, model.Password);
-            if (result == "Invalid credentials")
+
+            // If result indicates failure
+            if (!result.Success)
             {
-                return Unauthorized(new { message = result, code = 401 });
+                return Unauthorized(new { message = result.Message, code = result.Code });
             }
 
-            return Ok(new { Token = result, message = "Login successful", code = 200 });
+            // If result indicates success
+            return Ok(new { Token = result.Token, UserId = result.UserId, message = result.Message, code = result.Code });
         }
+
+
 
 
         // Reset Password

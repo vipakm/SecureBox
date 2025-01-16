@@ -1,4 +1,5 @@
 ﻿using SecureBox.Models;
+using SecureBox.ViewModels;
 
 namespace SecureBox.Services.Interface
 {
@@ -8,7 +9,7 @@ namespace SecureBox.Services.Interface
         Task<string> RegisterAsync(string userName, string userMailId, long? userPhoneNo, string userPassword);
 
         // Login User
-        Task<string> LoginAsync(string email, string password);
+        Task<LoginResult> LoginAsync(string email, string password); // Updated return type
 
         // Reset Password (Send OTP)
         Task<string> ResetPasswordAsync(string email);
