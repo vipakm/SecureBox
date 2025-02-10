@@ -23,7 +23,7 @@ public partial class AppDbContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseMySql("server=103.50.213.83;database=mramit_SecureBox;user=mramit_ecntech;password=Amit@2001;port=3306;persist security info=False;allow zero datetime=True;connect timeout=300", Microsoft.EntityFrameworkCore.ServerVersion.Parse("10.6.18-mariadb"));
+        => optionsBuilder.UseMySql("server=160.250.204.51;database=mramit_SecureBox;user=mramit_ecntech;password=Amit@2001;port=3306;persist security info=False;allow zero datetime=True;connect timeout=300", Microsoft.EntityFrameworkCore.ServerVersion.Parse("10.6.18-mariadb"));
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

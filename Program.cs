@@ -6,28 +6,33 @@ using SecureBox.Services;
 using System.Text;
 using SecureBox.Services.Implementation;
 using SecureBox.Services.Interface;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container
+// Add database context
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseMySql(builder.Configuration.GetConnectionString("ProductionConnection"),
-                     ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("ProductionConnection"))));
+    options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"),
+                     ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))));
 
+// Register services
 builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<OtpService>();
+builder.Services.AddScoped<JwtService>();
 
 // Register IHttpContextAccessor
-builder.Services.AddHttpContextAccessor();
-
-// Add session services
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
+    options.IdleTimeout = TimeSpan.FromMinutes(30); // Set timeout
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
-    options.IdleTimeout = TimeSpan.FromMinutes(20);
 });
+builder.Services.AddHttpContextAccessor();
+
+// ? Add MVC services (fixes TempData issues)
+builder.Services.AddControllersWithViews();
 
 // Configure JWT Authentication
 builder.Services.AddAuthentication(options =>
@@ -53,48 +58,26 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll",
-        builder => builder
-            .AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader());
+        policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
 
 // Add Swagger
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
-    {
-        Title = "SecureBox API",
-        Version = "v1",
-        Description = "A simple API for managing user authentication, email OTPs, and more."
-    });
-});
-
-builder.Services.AddControllers();
-
-builder.WebHost.UseUrls("http://localhost:5000", "https://localhost:7051");
+builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Enable Swagger middleware
+// Enable Swagger in Development
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "SecureBox API v1");
-        c.RoutePrefix = string.Empty;
-    });
+    app.UseSwaggerUI();
 }
 
-// Use CORS and session middleware
+// **ORDER MATTERS**: Middleware Execution Order
 app.UseCors("AllowAll");
-app.UseSession();
-
-// Use authentication and authorization middleware
-app.UseAuthentication();
+app.UseSession(); // Ensure session middleware is added
+app.UseRouting();
+app.UseAuthentication(); // ? Ensure authentication middleware is added
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();
