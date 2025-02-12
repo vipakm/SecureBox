@@ -7,13 +7,18 @@ using System.Text;
 using SecureBox.Services.Implementation;
 using SecureBox.Services.Interface;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add database context
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"),
-                     ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))));
+    options.UseMySql(
+        builder.Configuration.GetConnectionString("ProductionConnection"),
+        new MySqlServerVersion(new Version(8, 0, 21)) // Change version if needed
+    ));
+
+
 
 // Register services
 builder.Services.AddScoped<IEmailService, EmailService>();

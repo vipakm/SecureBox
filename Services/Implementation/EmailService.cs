@@ -11,7 +11,7 @@ namespace SecureBox.Services.Implementation
         private readonly string smtpServer = "mail.ecntech.in"; // Titan SMTP server
         private readonly int smtpPort = 587; // Port for TLS encryption
         private readonly string email = "SecureBox@ecntech.in"; // Your Titan email
-        private readonly string password = "dn897F1i&"; // Your email password
+        private readonly string password = "3P3f79k*e"; // Your email password
 
         public async Task SendEmailAsync(string recipient, string subject, string body)
         {
